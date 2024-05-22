@@ -70,7 +70,7 @@ def Chandel(client_socket, addr):
                 _, endpoint, params_json = request.split('|', 2)
                 params = json.loads(params_json)
                 news_data = get_allnews(endpoint, params)
-                Save_userlog("Project-Group-A15", client_name, "get_news", news_data)
+                Save_userlog("Group-B1", client_name, "get_news", news_data)
                 response = json.dumps(news_data).encode('utf-8')
                 response_length = len(response)
                 print(f"Sending response length: {response_length}")

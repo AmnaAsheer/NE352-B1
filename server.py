@@ -1,9 +1,8 @@
 import socket
-import json
 import threading
-#import requests
+import requests
+import json
 import os
-
 
 
 countries = {
@@ -36,113 +35,68 @@ categories = {
 sources = [
     {"name": "Source A", "country": "US", "description": "Description A", "url": "http://example.com/a", "category": "General", "language": "English"},
     {"name": "Source B", "country": "GB", "description": "Description B", "url": "http://example.com/b", "category": "Business", "language": "English"}
-    # Add more sample sources up to 15
 ]
 
-def send_list_and_details(socketC, data_list, list_keys, detail_keys):
-    # Send list of items
-    for idx, item in enumerate(data_list[:15]):
-        item_summary = {key: item[key] for key in item if key in list_keys}
-        socketC.sendall(json.dumps({"index": idx, **item_summary}).encode("utf-8"))
-        ack = socketC.recv(65535).decode("utf-8")  # Receive acknowledgment
-        if ack != "ACK":
-            break
 
-    # Signal the end of list
-    socketC.sendall(b"END_OF_LIST")
+NEWS_API_KEY = 'd4b3d0b1675f48709625f2ce6cd2aea4'
+BASE_URL = 'https://newsapi.org/v2/'
+HOST = '127.0.0.1'
+PORT = 65432
 
-    # Wait for item selection
-    selected_idx = int(socketC.recv(65535).decode("utf-8"))
+def get_allnews(endpoint, params):
+    params['apiKey'] = NEWS_API_KEY
+    response = requests.get(BASE_URL + endpoint, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {'status': 'error', 'message': 'Unnable to fetch data'}
 
-    if 0 <= selected_idx < len(data_list):
-        selected_item = data_list[selected_idx]
-        detail = {key: selected_item[key] for key in selected_item if key in detail_keys}
-        socketC.sendall(json.dumps(detail).encode("utf-8"))
+def Save_userlog(group_id, client_name, option, data):
+    filename = f"{group_id}_{client_name}_{option}.json"
+    with open(filename, 'w') as file:
+        json.dump(data, file, indent=4)
 
+def Chandel(client_socket, addr):
+    print(f"Accepted connection from {addr}")
+    try:
+        client_name = client_socket.recv(1024).decode('utf-8')
+        print(f"Client name: {client_name}")
+        while True:
+            request = client_socket.recv(1024).decode('utf-8')
+            if not request:
+                break
+            print(f"Requester: {client_name}, Request: {request}")
+            if request.startswith('get_news'):
+                _, endpoint, params_json = request.split('|', 2)
+                params = json.loads(params_json)
+                news_data = get_allnews(endpoint, params)
+                Save_userlog("Project-Group-A15", client_name, "get_news", news_data)
+                response = json.dumps(news_data).encode('utf-8')
+                response_length = len(response)
+                print(f"Sending response length: {response_length}")
+                client_socket.sendall(str(response_length).encode('utf-8').ljust(10))
+                client_socket.sendall(response)
+                print("Response sent")
+            else:
+                error_response = json.dumps({'status': 'error', 'message': 'Invalid request'}).encode('utf-8')
+                client_socket.sendall(str(len(error_response)).encode('utf-8').ljust(10))
+                client_socket.sendall(error_response)
+    except ConnectionResetError:
+        pass
+    finally:
+        print(f"Client {client_name} disconnected")
+        client_socket.close()
 
-
-def Chandel(SocketC,cname):
- print(f"Accepted connection from {cname}")
- while True:
-  request=SocketC.recv(65535).decode("utf-8")
-  main_menu = "Main Menu:\n1. Search Headlines\n2. List Sources\n3. Quit\nEnter your choice: "
-  SocketC.send(main_menu.encode("utf-8"))
-  choice = SocketC.recv(65535).decode("utf-8").strip()
-  if not request:
-   break
-  if choice == "1":  # Search Headlines
-   while True:
-            search_headlines_menu = "Search Headlines Menu:\n1. Search for Keywords\n2. Search by Category\n3. Search by Country\n4. List All News Headlines\n5. Back to Main Menu\nEnter your choice: "
-            SocketC.send(search_headlines_menu.encode("utf-8"))
-            search_choice = SocketC.recv(65535).decode("utf-8").strip()
-            if search_choice == "1":
-                # Handle searching for keywords
-                pass
- 
-            elif search_choice == "2":
-                # Handle searching by category
-                category_menu = "Select a Category:\n"
-                for key, value in categories.items():
-                    category_menu += f"{key}: {value}\n"
-                category_menu += "Enter the category: "
-                SocketC.send(category_menu.encode("utf-8"))
-                category_choice = SocketC.recv(65535).decode("utf-8").strip()
-
-            elif search_choice == "3":
-                # Handle searching by country
-                country_menu = "Select a Country:\n"
-                for key, value in countries.items():
-                    country_menu += f"{key}: {value}\n"
-                country_menu += "Enter the country: "
-                SocketC.send(country_menu.encode("utf-8"))
-                country_choice =SocketC.recv(65535).decode("utf-8").strip()
-
-            elif search_choice == "4":
-                # Handle listing all news headlines
-                pass
-
-            elif search_choice == "5":
-            # Go back to the main menu
-               continue
-          
-  elif choice == "2":  # List Sources
-              sources_menu = "Sources Menu:\n1. Search by Category\n2. Search by Country\n3. Search by Language\n4. List All Sources\n5. Back to Main Menu\nEnter your choice: "
-              SocketC.send(sources_menu.encode("utf-8"))
-              source_choice =SocketC.recv(65535).decode("utf-8").strip()
-
-              if source_choice == "1":
-                # Handle searching sources by category
-                pass
-              elif source_choice == "2":
-                # Handle searching sources by country
-                pass
-              elif source_choice == "3":
-                # Handle searching sources by language
-                pass
-              elif source_choice == "4":
-                # Handle listing all sources
-                pass
-              elif source_choice == "5":
-                continue  # Go back to the main menu
-              
-  elif choice == "3":  # Quit
-            break  # Terminate the connection and client  
-  
-
-    
 def main():
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen(5)
+    print(f'Server listening on {HOST}:{PORT}')
 
- SocketS = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
- SocketS.bind(("127.0.0.1", 6677))
- SocketS.listen(4)
- print("server listening for conections..")
- while True:
-  socketC, add = SocketS.accept()
-  cname=socketC.recv(65535).decode("utf-8")
-  cthread=threading.Thread(target=Chandel,args=(socketC,cname))
-  cthread.start()
+    while True:
+        client_socket, addr = server_socket.accept()
+        client_handler = threading.Thread(target=Chandel, args=(client_socket, addr))
+        client_handler.start()
 
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

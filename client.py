@@ -1,9 +1,6 @@
 import socket
 import json
 
-HOST = '127.0.0.1'
-PORT = 65432
-
 def mainrequest(SocketC, request):
     SocketC.send(request.encode('utf-8'))
     response_length_str = SocketC.recv(10).decode('utf-8').strip()
@@ -103,6 +100,9 @@ def receive_and_print(sources_data):
             print(f"{i+1}. {source['name']} ({source['country']})")
     else:
         print('Failed to fetch sources.')
+        
+HOST = '127.0.0.1'
+PORT = 65432
 
 if __name__ == '__main__':
     client_name = input("Enter your name: ")

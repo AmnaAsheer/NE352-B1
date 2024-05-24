@@ -9,6 +9,10 @@ This project involves the development of a multi-threaded server application tha
 
 ### Group 
 Group B1
+ITNE352
+Section 2
+Nouf Bureshaid - 202109273
+Amna Hesham - 202107285
 
 ### Table of Contents
 
